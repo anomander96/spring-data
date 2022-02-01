@@ -1,0 +1,78 @@
+package com.springdata.service.impl;
+
+import com.springdata.exception.GlobalApplicationException;
+import com.springdata.exception.UserAccountNotFoundException;
+import com.springdata.model.UserAccount;
+import com.springdata.repository.UserAccountRepository;
+import com.springdata.service.UserAccountService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+
+@Service
+@Slf4j
+public class UserAccountServiceImpl implements UserAccountService {
+
+    private final UserAccountRepository userAccountRepository;
+
+    public UserAccountServiceImpl(UserAccountRepository userAccountRepository) {
+        this.userAccountRepository = userAccountRepository;
+    }
+
+    @Override
+    public UserAccount createUserAccount(UserAccount userAccount) {
+        log.info("creating UserAccount");
+
+        if (userAccountIdIsPresent(userAccount)) {
+            throw new GlobalApplicationException("UserAccount for this user id is already present");
+        }
+        return userAccountRepository.save(userAccount);
+    }
+
+    private boolean userAccountIdIsPresent(UserAccount userAccount) {
+        return userAccountRepository.findByUserId(userAccount.getUserId()).isPresent();
+    }
+
+    @Override
+    public UserAccount getUserAccountById(long id) {
+        log.info("getting UserAccount by id " + id);
+
+        return userAccountRepository.findById(id)
+                .orElseThrow(() -> new UserAccountNotFoundException("UserAccount not found by id " + id));
+    }
+
+    @Override
+    public UserAccount getUserAccountByUserId(long userId) {
+        log.info("getting UserAccount by user id " + userId);
+
+        return userAccountRepository.findByUserId(userId)
+                .orElseThrow(() -> new UserAccountNotFoundException("UserAccount not found by user id " + userId));
+    }
+
+    @Transactional
+    @Override
+    public void topUpUserAccount(long userId, BigDecimal putMoney) {
+        log.info("top up account for user id " + userId);
+
+        if (putMoney.intValue() > 0) {
+            throw new GlobalApplicationException("Put money less or equal 0");
+        }
+        UserAccount userAccount = getUserAccountByUserId(userId);
+        userAccount.setMoney(userAccount.getMoney().add(putMoney));
+    }
+
+    @Transactional
+    @Override
+    public void withdrawMoneyFromAccount(long userId, BigDecimal getMoney) {
+        log.info("withdraw money from account for user id " + userId);
+
+        UserAccount userAccount = getUserAccountByUserId(userId);
+        if (userAccount.getMoney().compareTo(getMoney) < 0) {
+            throw new GlobalApplicationException("Not enough money for booking ticket");
+        } else {
+            userAccount.setMoney(userAccount.getMoney().subtract(getMoney));
+        }
+    }
+}
